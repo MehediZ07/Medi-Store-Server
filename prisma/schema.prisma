@@ -1,0 +1,199 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Authentication models for better-auth integration
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  accountId         String
+  providerId        String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  password          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([identifier, token])
+  @@map("verifications")
+}
+
+// User models
+
+enum UserRole {
+  CUSTOMER
+  SELLER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  name          String
+  image         String?
+  emailVerified Boolean?
+  role          UserRole   @default(CUSTOMER)
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // Relations
+  sessions      Session[]
+  accounts      Account[]
+  medicines     Medicine[] // For sellers
+  orders        Order[]    // For customers
+  reviews       Review[]   // For customers
+
+  @@map("users")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  medicines Medicine[]
+
+  @@map("categories")
+}
+
+// Medicine models
+
+enum MedicineStatus {
+  ACTIVE
+  INACTIVE
+  OUT_OF_STOCK
+}
+
+model Medicine {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  stock       Int             @default(0)
+  image       String?
+  status      MedicineStatus  @default(ACTIVE)
+  sellerId    String
+  categoryId  String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  seller     User        @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  category   Category    @relation(fields: [categoryId], references: [id])
+  orderItems OrderItem[]
+  reviews    Review[]
+
+  @@map("medicines")
+}
+
+// Order models
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  customerId  String
+  totalAmount Float
+  status      OrderStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  customer   User        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String @id @default(cuid())
+  orderId    String
+  medicineId String
+  quantity   Int
+  price      Float
+  createdAt  DateTime @default(now())
+
+  // Relations
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+
+  @@map("order_items")
+}
+
+// Review models
+
+model Review {
+  id         String   @id @default(cuid())
+  customerId String
+  medicineId String
+  rating     Int      @db.SmallInt // 1-5 rating
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  customer User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+
+  // Ensure one review per customer per medicine
+  @@unique([customerId, medicineId])
+  @@map("reviews")
+}
