@@ -6,7 +6,7 @@ import nodemailer from "nodemailer"
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
-  secure: false, // Use true for port 465, false for port 587
+  secure: false,
   auth: {
     user: process.env.APP_USER,
     pass: process.env.APP_PASS,
@@ -15,7 +15,7 @@ const transporter = nodemailer.createTransport({
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
-    provider: "postgresql", // or "mysql", "postgresql", ...etc
+    provider: "postgresql",
   }),
   trustedOrigins: [process.env.APP_URL!],
   user: {
@@ -40,13 +40,10 @@ export const auth = betterAuth({
   hooks: {
     user: {
       created: async ({ user }) => {
-        // Prevent non-admin users from setting ADMIN role
         if (user.role === 'ADMIN') {
-          // Check if this is being created by the seed script
           const isSeeding = process.env.SEEDING_ADMIN === 'true';
           
           if (!isSeeding) {
-            // Reset role to CUSTOMER if not from seed script
             await prisma.user.update({
               where: { id: user.id },
               data: { role: 'CUSTOMER' }
