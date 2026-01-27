@@ -1,0 +1,52 @@
+{
+  "name": "medistore-backend",
+  "version": "1.0.0",
+  "description": "A comprehensive medicine store API built with Node.js, Express, Prisma, and PostgreSQL",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "seed:admin": "tsx src/scripts/seedAdmin.ts",
+    "seed:all": "tsx src/scripts/seedDatabase.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio"
+  },
+  "keywords": [
+    "medicine",
+    "pharmacy",
+    "ecommerce",
+    "nodejs",
+    "express",
+    "prisma",
+    "postgresql",
+    "typescript"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/adapter-pg": "^5.22.0",
+    "@prisma/client": "^5.22.0",
+    "@types/bcrypt": "^6.0.0",
+    "bcrypt": "^6.0.0",
+    "better-auth": "^1.0.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.1",
+    "nodemailer": "^7.0.12",
+    "pg": "^8.13.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.9.0",
+    "@types/nodemailer": "^6.4.19",
+    "@types/pg": "^8.11.10",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
