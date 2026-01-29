@@ -76,7 +76,7 @@ model User {
   email         String     @unique
   name          String
   image         String?
-  emailVerified Boolean?
+  emailVerified Boolean?   @default(true)
   role          UserRole   @default(CUSTOMER)
   status        UserStatus @default(ACTIVE)
   createdAt     DateTime   @default(now())
