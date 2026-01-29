@@ -35,23 +35,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     autoSignIn: false,
-    requireEmailVerification: false
-  },
-  hooks: {
-    user: {
-      created: async ({ user }) => {
-        if (user.role === 'ADMIN') {
-          const isSeeding = process.env.SEEDING_ADMIN === 'true';
-          
-          if (!isSeeding) {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { role: 'CUSTOMER' }
-            });
-          }
-        }
-      }
-    }
+    requireEmailVerification: true
   },
   emailVerification: {
     sendOnSignUp: true,
@@ -201,6 +185,10 @@ export const auth = betterAuth({
         throw err;
       }
     },
+    redirect: {
+      onSuccess: `${process.env.APP_URL}/?verified=true`,
+      onError: `${process.env.APP_URL}/verify-email?error=true`
+    }
   },
 
   socialProviders: {
