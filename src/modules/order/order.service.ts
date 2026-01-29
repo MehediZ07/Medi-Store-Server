@@ -4,9 +4,17 @@ import { calculatePagination, formatPaginationResponse, PaginationOptions } from
 export const orderService = {
   async createOrder(data: {
     customerId: string;
-    items: { medicineId: string; quantity: number }[];
+    items: { medicineId: string; quantity: number; price: number }[];
+    shippingAddress: {
+      fullName: string;
+      address: string;
+      city: string;
+      zipCode: string;
+      phone: string;
+    };
+    totalAmount: number;
   }) {
-    let totalAmount = 0;
+    let calculatedTotal = 0;
     const orderItems = [];
 
     for (const item of data.items) {
@@ -18,12 +26,14 @@ export const orderService = {
         throw new Error(`Medicine with id ${item.medicineId} not found`);
       }
 
+      console.log(`Found medicine: ${medicine.name}, Stock: ${medicine.stock}`);
+
       if (medicine.stock < item.quantity) {
         throw new Error(`Insufficient stock for ${medicine.name}`);
       }
 
       const itemTotal = medicine.price * item.quantity;
-      totalAmount += itemTotal;
+      calculatedTotal += itemTotal;
 
       orderItems.push({
         medicineId: item.medicineId,
@@ -35,7 +45,12 @@ export const orderService = {
     const order = await prisma.order.create({
       data: {
         customerId: data.customerId,
-        totalAmount,
+        totalAmount: data.totalAmount,
+        fullName: data.shippingAddress.fullName,
+        address: data.shippingAddress.address,
+        city: data.shippingAddress.city,
+        zipCode: data.shippingAddress.zipCode,
+        phone: data.shippingAddress.phone,
         orderItems: {
           create: orderItems,
         },
@@ -75,11 +90,20 @@ export const orderService = {
         skip,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
-        include: {
+        select: {
+          id: true,
+          status: true,
+          totalAmount: true,
+          createdAt: true,
+          fullName: true,
+          address: true,
+          city: true,
+          zipCode: true,
+          phone: true,
           orderItems: {
             include: {
               medicine: {
-                select: { id: true, name: true, image: true },
+                select: { id: true, name: true, image: true, price: true },
               },
             },
           },
@@ -97,6 +121,62 @@ export const orderService = {
         id,
         customerId: userId,
       },
+      select: {
+        id: true,
+        status: true,
+        totalAmount: true,
+        createdAt: true,
+        fullName: true,
+        address: true,
+        city: true,
+        zipCode: true,
+        phone: true,
+        customer: {
+          select: { id: true, name: true, email: true },
+        },
+        orderItems: {
+          include: {
+            medicine: {
+              select: { id: true, name: true, image: true, price: true },
+            },
+          },
+        },
+      },
+    });
+  },
+
+  async cancelOrder(orderId: string, userId: string) {
+    const order = await prisma.order.findFirst({
+      where: {
+        id: orderId,
+        customerId: userId,
+        status: 'PLACED', // Only allow cancellation of PLACED orders
+      },
+      include: {
+        orderItems: true,
+      },
+    });
+
+    if (!order) {
+      throw new Error('Order not found or cannot be cancelled');
+    }
+
+    // Restore stock for cancelled items
+    for (const item of order.orderItems) {
+      await prisma.medicine.update({
+        where: { id: item.medicineId },
+        data: {
+          stock: {
+            increment: item.quantity,
+          },
+        },
+      });
+    }
+
+    // Update order status to cancelled
+    return await prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'CANCELLED' },
       include: {
         customer: {
           select: { id: true, name: true, email: true },

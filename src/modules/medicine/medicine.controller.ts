@@ -34,7 +34,7 @@ export const medicineController = {
   async getMedicineById(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const medicine = await medicineService.getMedicineById(id);
+      const medicine = await medicineService.getMedicineById(String(id));
 
       if (!medicine) {
         return res.status(404).json({

@@ -19,7 +19,7 @@ export const categoryController = {
   async getCategoryById(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const category = await categoryService.getCategoryById(id);
+      const category = await categoryService.getCategoryById(String(id));
       
       if (!category) {
         return res.status(404).json({
@@ -55,7 +55,7 @@ export const categoryController = {
   async updateCategory(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const category = await categoryService.updateCategory(id, req.body);
+      const category = await categoryService.updateCategory(String(id), req.body);
       
       res.json({
         success: true,
@@ -70,7 +70,7 @@ export const categoryController = {
   async deleteCategory(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      await categoryService.deleteCategory(id);
+      await categoryService.deleteCategory(String(id));
       
       res.json({
         success: true,

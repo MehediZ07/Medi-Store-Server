@@ -9,5 +9,6 @@ router.use(authenticate);
 router.post('/', orderController.createOrder);
 router.get('/', orderController.getUserOrders);
 router.get('/:id', orderController.getOrderById);
+router.patch('/:id/cancel', orderController.cancelOrder);
 
 export const orderRouter = router;

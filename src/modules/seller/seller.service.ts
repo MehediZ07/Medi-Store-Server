@@ -58,8 +58,21 @@ export const sellerService = {
         skip,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
-        include: {
-          category: true,
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          price: true,
+          stock: true,
+          image: true,
+          status: true,
+          createdAt: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           _count: {
             select: { reviews: true, orderItems: true },
           },
@@ -68,7 +81,12 @@ export const sellerService = {
       prisma.medicine.count({ where: { sellerId } }),
     ]);
 
-    return formatPaginationResponse(medicines, total, page, limit);
+    const medicinesWithIsActive = medicines.map(medicine => ({
+      ...medicine,
+      isActive: medicine.status === 'ACTIVE',
+    }));
+
+    return formatPaginationResponse(medicinesWithIsActive, total, page, limit);
   },
 
   async getSellerOrders(sellerId: string, paginationOptions: PaginationOptions) {
@@ -215,7 +233,7 @@ export const sellerService = {
       }),
       prisma.order.count({
         where: {
-          status: 'PENDING',
+          status: 'PLACED',
           orderItems: {
             some: {
               medicine: { sellerId },

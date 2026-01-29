@@ -50,7 +50,7 @@ export const orderController = {
       const { id } = req.params;
       const userId = req.user!.id;
 
-      const order = await orderService.getOrderById(id, userId);
+      const order = await orderService.getOrderById(String(id), userId);
 
       if (!order) {
         return res.status(404).json({
@@ -62,6 +62,23 @@ export const orderController = {
       res.json({
         success: true,
         message: 'Order retrieved successfully',
+        data: order,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async cancelOrder(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+
+      const order = await orderService.cancelOrder(String(id), userId);
+
+      res.json({
+        success: true,
+        message: 'Order cancelled successfully',
         data: order,
       });
     } catch (error) {

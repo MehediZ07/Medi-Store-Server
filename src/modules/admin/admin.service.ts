@@ -48,7 +48,14 @@ export const adminService = {
           orderItems: {
             include: {
               medicine: {
-                select: { id: true, name: true, price: true },
+                select: { 
+                  id: true, 
+                  name: true, 
+                  price: true,
+                  seller: {
+                    select: { id: true, name: true, email: true }
+                  }
+                },
               },
             },
           },
