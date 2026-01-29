@@ -26,7 +26,6 @@ export const orderService = {
         throw new Error(`Medicine with id ${item.medicineId} not found`);
       }
 
-      console.log(`Found medicine: ${medicine.name}, Stock: ${medicine.stock}`);
 
       if (medicine.stock < item.quantity) {
         throw new Error(`Insufficient stock for ${medicine.name}`);
