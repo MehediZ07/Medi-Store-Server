@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { auth } from '../lib/auth';
+import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -17,18 +20,38 @@ export const authenticate = async (
   next: NextFunction
 ) => {
   try {
-    const session = await auth.api.getSession({
-      headers: req.headers as any,
-    });
-
-    if (!session) {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
         message: 'Authentication required',
       });
     }
 
-    req.user = session.user as any;
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, process.env.BETTER_AUTH_SECRET || 'fallback-secret') as any;
+    
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        status: true,
+        emailVerified: true
+      }
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid authentication token',
+      });
+    }
+
+    req.user = user as any;
     next();
   } catch (error) {
     return res.status(401).json({

@@ -1,7 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import { toNodeHandler } from 'better-auth/node';
-import { auth } from './lib/auth';
 import { globalErrorHandler } from './middlewares/globalErrorHandler';
 import { notFound } from './middlewares/notFound';
 
@@ -11,7 +9,7 @@ import { orderRouter } from './modules/order/order.router';
 import { reviewRouter } from './modules/review/review.router';
 import { sellerRouter } from './modules/seller/seller.router';
 import { adminRouter } from './modules/admin/admin.router';
-import { authenticate } from './middlewares/auth';
+import authRouter from './modules/auth/auth.router';
 
 const app = express();
 
@@ -31,14 +29,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/api/auth/me', authenticate, (req: any, res) => {
-  res.json({
-    success: true,
-    data: req.user
-  });
-});
-
-app.all('/api/auth/*', toNodeHandler(auth));
+app.use('/api/auth', authRouter);
 
 app.use('/api/medicines', medicineRouter);
 app.use('/api/categories', categoryRouter);

@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma";
-import { auth } from "../lib/auth";
+import bcrypt from 'bcryptjs';
 import { randomUUID } from "crypto";
 
 async function seedAdmin() {
@@ -11,19 +11,16 @@ async function seedAdmin() {
             password: "admin123"
         };
 
-
         const existing = await prisma.user.findUnique({
             where: { email: adminData.email }
         });
 
         if (existing) {
+            console.log('Admin user already exists');
             return;
         }
 
-        const ctx = await auth.$context;
-        const hashedPassword = await ctx.password.hash(adminData.password);
-
-        process.env.SEEDING_ADMIN = 'true';
+        const hashedPassword = await bcrypt.hash(adminData.password, 10);
         
         const user = await prisma.user.create({
             data: {
@@ -46,9 +43,6 @@ async function seedAdmin() {
             }
         });
 
-        delete process.env.SEEDING_ADMIN;
-
-
         const categories = [
             { name: 'Pain Relief', description: 'Analgesics, Anti-inflammatory drugs, Pain management' },
             { name: 'Antibiotics', description: 'Bacterial infection treatments, Antimicrobial drugs' },
@@ -68,6 +62,8 @@ async function seedAdmin() {
             });
         }
 
+        console.log('✅ Admin user and categories created successfully');
+        console.log('🔑 Admin Login: admin@medistore.com / admin123');
 
     } catch (error) {
         console.error("Admin seeding failed:", error);
