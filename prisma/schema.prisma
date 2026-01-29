@@ -138,8 +138,8 @@ model Medicine {
 // Order models
 
 enum OrderStatus {
-  PENDING
-  CONFIRMED
+  PLACED
+  PROCESSING
   SHIPPED
   DELIVERED
   CANCELLED
@@ -149,7 +149,15 @@ model Order {
   id          String      @id @default(cuid())
   customerId  String
   totalAmount Float
-  status      OrderStatus @default(PENDING)
+  status      OrderStatus @default(PLACED)
+  
+  // Shipping Address
+  fullName    String
+  address     String
+  city        String
+  zipCode     String
+  phone       String
+  
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
