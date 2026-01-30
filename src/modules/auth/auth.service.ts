@@ -161,3 +161,32 @@ export const invalidateSession = async (token: string) => {
     where: { token }
   });
 };
+
+export const updateProfile = async (userId: string, updateData: { name?: string; image?: string }) => {
+  const { name, image } = updateData;
+
+  // Validate name if provided
+  if (name && name.trim().length < 2) {
+    throw new Error('Name must be at least 2 characters long');
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(name && { name: name.trim() }),
+      ...(image !== undefined && { image })
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      status: true,
+      emailVerified: true,
+      image: true,
+      createdAt: true
+    }
+  });
+
+  return updatedUser;
+};

@@ -10,6 +10,7 @@ router.post('/login', authController.signin);
 
 // Protected routes
 router.get('/me', authenticate, authController.getMe);
+router.patch('/profile', authenticate, authController.updateProfile);
 router.post('/sign-out', authenticate, authController.signout);
 
 export default router;
