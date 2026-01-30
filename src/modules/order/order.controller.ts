@@ -11,12 +11,12 @@ export const orderController = {
         customerId,
       };
 
-      const order = await orderService.createOrder(orderData);
+      const result = await orderService.createOrder(orderData);
 
       res.status(201).json({
         success: true,
-        message: 'Order created successfully',
-        data: order,
+        message: `Order created successfully and split into ${result.sellerOrders.length} seller orders`,
+        data: result.parentOrder,
       });
     } catch (error) {
       next(error);

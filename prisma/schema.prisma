@@ -87,6 +87,7 @@ model User {
   accounts      Account[]
   medicines     Medicine[] 
   orders        Order[]    
+  sellerOrders  Order[]    @relation("SellerOrders")
   reviews       Review[] 
 
   @@map("users")
@@ -146,24 +147,29 @@ enum OrderStatus {
 }
 
 model Order {
-  id          String      @id @default(cuid())
-  customerId  String
-  totalAmount Float
-  status      OrderStatus @default(PLACED)
+  id            String      @id @default(cuid())
+  customerId    String
+  sellerId      String?     // For seller-specific orders
+  parentOrderId String?     // For linking child orders to parent
+  totalAmount   Float
+  status        OrderStatus @default(PLACED)
   
   // Shipping Address
-  fullName    String
-  address     String
-  city        String
-  zipCode     String
-  phone       String
+  fullName      String
+  address       String
+  city          String
+  zipCode       String
+  phone         String
   
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   // Relations
-  customer   User        @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  orderItems OrderItem[]
+  customer      User        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  seller        User?       @relation("SellerOrders", fields: [sellerId], references: [id])
+  parentOrder   Order?      @relation("OrderHierarchy", fields: [parentOrderId], references: [id])
+  childOrders   Order[]     @relation("OrderHierarchy")
+  orderItems    OrderItem[]
 
   @@map("orders")
 }

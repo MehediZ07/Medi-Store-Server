@@ -14,34 +14,37 @@ export const orderService = {
     };
     totalAmount: number;
   }) {
-    let calculatedTotal = 0;
-    const orderItems = [];
-
+    // Group items by seller
+    const itemsBySeller: { [sellerId: string]: any[] } = {};
+    
     for (const item of data.items) {
       const medicine = await prisma.medicine.findUnique({
         where: { id: item.medicineId },
+        include: { seller: true }
       });
 
       if (!medicine) {
         throw new Error(`Medicine with id ${item.medicineId} not found`);
       }
 
-
       if (medicine.stock < item.quantity) {
         throw new Error(`Insufficient stock for ${medicine.name}`);
       }
 
-      const itemTotal = medicine.price * item.quantity;
-      calculatedTotal += itemTotal;
-
-      orderItems.push({
-        medicineId: item.medicineId,
-        quantity: item.quantity,
-        price: medicine.price,
+      const sellerId = medicine.sellerId;
+      if (!itemsBySeller[sellerId]) {
+        itemsBySeller[sellerId] = [];
+      }
+      
+      itemsBySeller[sellerId].push({
+        ...item,
+        medicine,
+        price: medicine.price
       });
     }
 
-    const order = await prisma.order.create({
+    // Create parent order
+    const parentOrder = await prisma.order.create({
       data: {
         customerId: data.customerId,
         totalAmount: data.totalAmount,
@@ -50,22 +53,52 @@ export const orderService = {
         city: data.shippingAddress.city,
         zipCode: data.shippingAddress.zipCode,
         phone: data.shippingAddress.phone,
-        orderItems: {
-          create: orderItems,
-        },
-      },
-      include: {
-        customer: {
-          select: { id: true, name: true, email: true },
-        },
-        orderItems: {
-          include: {
-            medicine: true,
-          },
-        },
-      },
+        status: 'PLACED'
+      }
     });
 
+    // Create seller orders
+    const sellerOrders = [];
+    
+    for (const [sellerId, items] of Object.entries(itemsBySeller)) {
+      const sellerTotal = items.reduce((sum, item) => 
+        sum + (item.medicine.price * item.quantity), 0
+      );
+      
+      const sellerOrder = await prisma.order.create({
+        data: {
+          customerId: data.customerId,
+          sellerId: sellerId,
+          parentOrderId: parentOrder.id,
+          totalAmount: sellerTotal,
+          fullName: data.shippingAddress.fullName,
+          address: data.shippingAddress.address,
+          city: data.shippingAddress.city,
+          zipCode: data.shippingAddress.zipCode,
+          phone: data.shippingAddress.phone,
+          status: 'PLACED',
+          orderItems: {
+            create: items.map(item => ({
+              medicineId: item.medicineId,
+              quantity: item.quantity,
+              price: item.medicine.price
+            }))
+          }
+        },
+        include: {
+          orderItems: {
+            include: { medicine: true }
+          },
+          seller: {
+            select: { id: true, name: true, email: true }
+          }
+        }
+      });
+      
+      sellerOrders.push(sellerOrder);
+    }
+
+    // Update stock
     for (const item of data.items) {
       await prisma.medicine.update({
         where: { id: item.medicineId },
@@ -77,7 +110,7 @@ export const orderService = {
       });
     }
 
-    return order;
+    return { parentOrder, sellerOrders };
   },
 
   async getUserOrders(userId: string, paginationOptions: PaginationOptions) {
@@ -85,7 +118,10 @@ export const orderService = {
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
-        where: { customerId: userId },
+        where: { 
+          customerId: userId,
+          parentOrderId: null
+        },
         skip,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
@@ -99,16 +135,28 @@ export const orderService = {
           city: true,
           zipCode: true,
           phone: true,
-          orderItems: {
+          childOrders: {
             include: {
-              medicine: {
-                select: { id: true, name: true, image: true, price: true },
+              seller: {
+                select: { id: true, name: true, email: true }
+              },
+              orderItems: {
+                include: {
+                  medicine: {
+                    select: { id: true, name: true, image: true, price: true },
+                  },
+                },
               },
             },
           },
         },
       }),
-      prisma.order.count({ where: { customerId: userId } }),
+      prisma.order.count({ 
+        where: { 
+          customerId: userId,
+          parentOrderId: null 
+        } 
+      }),
     ]);
 
     return formatPaginationResponse(orders, total, page, limit);
@@ -119,6 +167,7 @@ export const orderService = {
       where: {
         id,
         customerId: userId,
+        parentOrderId: null
       },
       select: {
         id: true,
@@ -133,10 +182,17 @@ export const orderService = {
         customer: {
           select: { id: true, name: true, email: true },
         },
-        orderItems: {
+        childOrders: {
           include: {
-            medicine: {
-              select: { id: true, name: true, image: true, price: true },
+            seller: {
+              select: { id: true, name: true, email: true }
+            },
+            orderItems: {
+              include: {
+                medicine: {
+                  select: { id: true, name: true, image: true, price: true },
+                },
+              },
             },
           },
         },
@@ -149,10 +205,15 @@ export const orderService = {
       where: {
         id: orderId,
         customerId: userId,
-        status: 'PLACED', // Only allow cancellation of PLACED orders
+        parentOrderId: null,
+        status: 'PLACED',
       },
       include: {
-        orderItems: true,
+        childOrders: {
+          include: {
+            orderItems: true,
+          },
+        },
       },
     });
 
@@ -160,19 +221,25 @@ export const orderService = {
       throw new Error('Order not found or cannot be cancelled');
     }
 
-    // Restore stock for cancelled items
-    for (const item of order.orderItems) {
-      await prisma.medicine.update({
-        where: { id: item.medicineId },
-        data: {
-          stock: {
-            increment: item.quantity,
-          },
-        },
+    // Cancel all child orders and restore stock
+    for (const childOrder of order.childOrders) {
+      await prisma.order.update({
+        where: { id: childOrder.id },
+        data: { status: 'CANCELLED' },
       });
+
+      for (const item of childOrder.orderItems) {
+        await prisma.medicine.update({
+          where: { id: item.medicineId },
+          data: {
+            stock: {
+              increment: item.quantity,
+            },
+          },
+        });
+      }
     }
 
-    // Update order status to cancelled
     return await prisma.order.update({
       where: { id: orderId },
       data: { status: 'CANCELLED' },
@@ -180,12 +247,46 @@ export const orderService = {
         customer: {
           select: { id: true, name: true, email: true },
         },
-        orderItems: {
+        childOrders: {
           include: {
-            medicine: true,
+            seller: {
+              select: { name: true }
+            },
+            orderItems: {
+              include: {
+                medicine: true,
+              },
+            },
           },
         },
       },
+    });
+  },
+
+  async updateParentOrderStatus(parentOrderId: string) {
+    const childOrders = await prisma.order.findMany({
+      where: { parentOrderId },
+      select: { status: true }
+    });
+
+    if (childOrders.length === 0) return;
+
+    const statuses = childOrders.map(order => order.status);
+    let parentStatus = 'PLACED';
+
+    if (statuses.every(status => status === 'DELIVERED')) {
+      parentStatus = 'DELIVERED';
+    } else if (statuses.every(status => status === 'CANCELLED')) {
+      parentStatus = 'CANCELLED';
+    } else if (statuses.some(status => status === 'SHIPPED')) {
+      parentStatus = 'PROCESSING';
+    } else if (statuses.some(status => status === 'PROCESSING')) {
+      parentStatus = 'PROCESSING';
+    }
+
+    await prisma.order.update({
+      where: { id: parentOrderId },
+      data: { status: parentStatus as any }
     });
   },
 };
