@@ -95,8 +95,13 @@ export const sellerService = {
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
         where: {
-          sellerId: sellerId,
-          parentOrderId: { not: null }
+          orderItems: {
+            some: {
+              medicine: {
+                sellerId,
+              },
+            },
+          },
         },
         skip,
         take: limit,
@@ -106,6 +111,11 @@ export const sellerService = {
             select: { id: true, name: true, email: true },
           },
           orderItems: {
+            where: {
+              medicine: {
+                sellerId,
+              },
+            },
             include: {
               medicine: true,
             },
@@ -114,8 +124,13 @@ export const sellerService = {
       }),
       prisma.order.count({
         where: {
-          sellerId: sellerId,
-          parentOrderId: { not: null }
+          orderItems: {
+            some: {
+              medicine: {
+                sellerId,
+              },
+            },
+          },
         },
       }),
     ]);
@@ -124,13 +139,16 @@ export const sellerService = {
   },
 
   async updateOrderStatus(orderId: string, sellerId: string, status: string) {
-    const { orderService } = await import('../order/order.service');
-    
     const order = await prisma.order.findFirst({
       where: {
         id: orderId,
-        sellerId: sellerId,
-        parentOrderId: { not: null }
+        orderItems: {
+          some: {
+            medicine: {
+              sellerId,
+            },
+          },
+        },
       },
     });
 
@@ -138,7 +156,7 @@ export const sellerService = {
       throw new Error('Order not found or unauthorized');
     }
 
-    const updatedOrder = await prisma.order.update({
+    return await prisma.order.update({
       where: { id: orderId },
       data: { status: status as any },
       include: {
@@ -152,13 +170,6 @@ export const sellerService = {
         },
       },
     });
-
-    // Update parent order status
-    if (order.parentOrderId) {
-      await orderService.updateParentOrderStatus(order.parentOrderId);
-    }
-
-    return updatedOrder;
   },
 
   async getSellerProfile(sellerId: string) {
@@ -212,15 +223,21 @@ export const sellerService = {
       prisma.medicine.count({ where: { sellerId, status: 'ACTIVE' } }),
       prisma.order.count({
         where: {
-          sellerId: sellerId,
-          parentOrderId: { not: null }
+          orderItems: {
+            some: {
+              medicine: { sellerId },
+            },
+          },
         },
       }),
       prisma.order.count({
         where: {
           status: 'PLACED',
-          sellerId: sellerId,
-          parentOrderId: { not: null }
+          orderItems: {
+            some: {
+              medicine: { sellerId },
+            },
+          },
         },
       }),
       prisma.orderItem.aggregate({
@@ -233,8 +250,11 @@ export const sellerService = {
       }).then(result => result._sum.price || 0),
       prisma.order.findMany({
         where: {
-          sellerId: sellerId,
-          parentOrderId: { not: null }
+          orderItems: {
+            some: {
+              medicine: { sellerId },
+            },
+          },
         },
         take: 5,
         orderBy: { createdAt: 'desc' },
@@ -243,6 +263,9 @@ export const sellerService = {
             select: { name: true, email: true },
           },
           orderItems: {
+            where: {
+              medicine: { sellerId },
+            },
             include: {
               medicine: {
                 select: { name: true },
